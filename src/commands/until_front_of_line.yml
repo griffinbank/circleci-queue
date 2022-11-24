@@ -125,13 +125,13 @@ steps:
             jobs_api_url_template="${CIRCLECI_BASE_URL}/api/v1.1/project/${VCS_TYPE}/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/tree/$(urlencode "${CIRCLE_BRANCH}")?filter=running"
           fi
 
-          if [ ! -z $TESTING_MOCK_RESPONSE ] && [ -f $TESTING_MOCK_RESPONSE ];then
+          if [ ! -z "${TESTING_MOCK_RESPONSE}" ] && [ -f "${TESTING_MOCK_RESPONSE}" ];then
             echo "Using test mock response"
-            cat $TESTING_MOCK_RESPONSE > /tmp/jobstatus.json
+            cat "${TESTING_MOCK_RESPONSE}" > /tmp/jobstatus.json
           else
             echo "Attempting to access CircleCI api. If the build process fails after this step, ensure your << parameters.circleci-api-key >>  is set."
             fetch "$jobs_api_url_template" "/tmp/jobstatus.json"
-            if [ -n "${CIRCLE_TAG:x}" ] && [ "$tag_pattern" != "" ]; then
+            if [ -n "${CIRCLE_TAG:x}" ] && [ "${tag_pattern}" != "" ]; then
               jq "[ .[] | select((.build_num | . == \"${CIRCLE_BUILD_NUM}\") or (.vcs_tag | (. != null and test(\"${tag_pattern}\"))) ) ]" /tmp/jobstatus.json >/tmp/jobstatus_tag.json
               mv /tmp/jobstatus_tag.json /tmp/jobstatus.json
             fi
@@ -145,13 +145,13 @@ steps:
           do
             echo "Checking time of workflow: ${workflow}"
             workflow_file=/tmp/workflow-${workflow}.json
-            if [ ! -z $TESTING_MOCK_WORKFLOW_RESPONSES ] && [ -f $TESTING_MOCK_WORKFLOW_RESPONSES/${workflow}.json ]; then
+            if [ ! -z "${TESTING_MOCK_WORKFLOW_RESPONSES}" ] && [ -f "${TESTING_MOCK_WORKFLOW_RESPONSES}/${workflow}.json" ]; then
               echo "Using test mock workflow response"
-              cat $TESTING_MOCK_WORKFLOW_RESPONSES/${workflow}.json > ${workflow_file}
+              cat "${TESTING_MOCK_WORKFLOW_RESPONSES}/${workflow}.json" > "${workflow_file}"
             else
               fetch "${CIRCLECI_BASE_URL}/api/v2/workflow/${workflow}" "${workflow_file}"
             fi
-            created_at=`jq -r '.created_at' ${workflow_file}`
+            created_at=$(jq -r '.created_at' "${workflow_file}")
             echo "Workflow was created at: ${created_at}"
             cat /tmp/augmented_jobstatus.json | jq --arg created_at "${created_at}" --arg workflow "${workflow}" '(.[] | select(.workflows.workflow_id == $workflow) | .workflows) |= . + {created_at:$created_at}' > /tmp/augmented_jobstatus-${workflow}.json
             #DEBUG echo "new augmented_jobstatus:"
@@ -218,12 +218,10 @@ steps:
           curl -s -X POST $cancel_api_url_template > /dev/null
         }
 
-
-
         #
         # We can skip a few use cases without calling API
         #
-        if [ ! -z "$CIRCLE_PR_REPONAME" ]; then
+        if [ ! -z "${CIRCLE_PR_REPONAME}" ]; then
           echo "Queueing on forks is not supported. Skipping queue..."
           # It's important that we not fail here because it could cause issues on the main repo's branch
           exit 0
@@ -252,12 +250,12 @@ steps:
         confidence=0
         while true; do
           update_comparables
-          echo "This Workflow Timestamp: $my_commit_time"
-          echo "Oldest Workflow Timestamp: $oldest_commit_time"
-          if [[ ! -z "$my_commit_time" ]] && [[ "$oldest_commit_time" > "$my_commit_time" || "$oldest_commit_time" = "$my_commit_time" ]] ; then
+          echo "This Workflow Timestamp: ${my_commit_time}"
+          echo "Oldest Workflow Timestamp: ${oldest_commit_time}"
+          if [[ ! -z "${my_commit_time}" ]] && [[ "${oldest_commit_time}" > "${my_commit_time}" || "${oldest_commit_time}" = "${my_commit_time}" ]] ; then
             # API returns Y-M-D HH:MM (with 24 hour clock) so alphabetical string compare is accurate to timestamp compare as well
-            # recent-jobs API does not include pending, so it is possible we queried in between a workflow transition, and we;re NOT really front of line.
-            if [ $confidence -lt <<parameters.confidence>> ];then
+            # recent-jobs API does not include pending, so it is possible we queried in between a workflow transition, and we're NOT really front of line.
+            if [ "${confidence}" -lt "<<parameters.confidence>>" ];then
               # To grow confidence, we check again with a delay.
               confidence=$((confidence+1))
               echo "API shows no previous jobs/workflows, but it is possible a previous workflow has pending jobs not yet visible in API."
@@ -285,6 +283,6 @@ steps:
             fi
           fi
 
-          sleep $loop_time
+          sleep ${loop_time}
           wait_time=$(( loop_time + wait_time ))
         done

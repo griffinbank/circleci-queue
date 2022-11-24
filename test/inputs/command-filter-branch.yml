@@ -1,9 +1,9 @@
 jobs:
   build:
     docker:
-      - image: circleci/node:10
+      - image: cimg/node:lts
     working_directory: ~/repo
     steps:
-      - queue/until_front_of_line:
+      - circleci-queue/until_front_of_line:
           time: "1"
           only-on-branch: "master"

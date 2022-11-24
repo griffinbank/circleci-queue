@@ -29,12 +29,9 @@ description: |
   1.4.0: Adds confidence checks to avoid race condition 
   1.3.0: use small resource class in job
 
-
-
-  
 display:
   home_url: https://eddiewebb.github.io/circleci-queue/
-  source_url: https://github.com/eddiewebb/circleci-queue
+  source_url: https://github.com/griffinbank/circleci-queue
 
 examples:
   queue_workflow:
@@ -42,18 +39,18 @@ examples:
     usage:
       version: 2.1
       orbs:
-        queue: eddiewebb/queue@volatile
+        queue: griffinbank/circleci-queue@volatile
 
       workflows:
         build_deploy:
           jobs:
             - queue/block_workflow:
-                time: "10"                # max wait, in minutes (default 10)
+                time: "10"              # max wait, in minutes (default 10)
                 only-on-branch: master  # restrict queueing to a specific branch (default *)
             - some_other_job:
                 requires:
                   - queue/block_workflow
-           
+
   single_concurrency_job:
     description: |
       Used to ensure that a only single job (deploy) is not run concurrently. 
@@ -62,7 +59,7 @@ examples:
     usage:
       version: 2.1
       orbs:
-        queue: eddiewebb/queue@volatile
+        queue: griffinbank/circleci-queue@volatile
 
       workflows:
         build_deploy:
@@ -74,25 +71,25 @@ examples:
       jobs:
         build:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - run: echo "This job can overlap"
 
         deploy:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - queue/until_front_of_line:
-                time: "10"                # max wait, in minutes (default 10)
+                time: "10"              # max wait, in minutes (default 10)
                 only-on-branch: master  # restrict queueing to a specific branch (default *)
             - run: echo "This job will not overlap"
-  
+
   multiple_job_names_regexp:
     description: Use regexp-jobname when you have multiple jobs to block order of.
     usage:
       version: 2.1
       orbs:
-        queue: eddiewebb/queue@volatile
+        queue: griffinbank/circleci-queue@volatile
 
       workflows:
         build_deploy:
@@ -107,23 +104,23 @@ examples:
       jobs:
         build:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - run: echo "This job can overlap"
 
         DeployStep1:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - queue/until_front_of_line:
-                time: "10"               
-                only-on-branch: master  
-                job-regex: "^DeployStep[0-9]$" #use extendex regexp pattern 
-            - run: echo "This job will not overlap with itself or next similar nameds job"
+                time: "10"
+                only-on-branch: master
+                job-regex: "^DeployStep[0-9]$" # use extended regexp pattern
+            - run: echo "This job will not overlap with itself or next similar named job"
 
         DeployStep2:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - run: echo "This job will block step1 on any further workflows"
 
