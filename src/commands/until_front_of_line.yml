@@ -124,7 +124,7 @@ steps:
 
 
         fetch_filtered_active_builds(){
-          if [ "<<parameters.consider-branch>>" != "true" ];then
+          if [ "<<parameters.consider-branch>>" != "true" ]; then
             echo "Orb parameter 'consider-branch' is false, will block previous builds on any branch." 
             jobs_api_url_template="${CIRCLECI_BASE_URL}/api/v1.1/project/${VCS_TYPE}/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}?filter=running"
           elif [ -n "${CIRCLE_TAG:x}" ] && [ "$tag_pattern" != "" ]; then
@@ -137,7 +137,7 @@ steps:
             jobs_api_url_template="${CIRCLECI_BASE_URL}/api/v1.1/project/${VCS_TYPE}/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/tree/$(urlencode "${CIRCLE_BRANCH}")?filter=running"
           fi
 
-          if [ ! -z "${TESTING_MOCK_RESPONSE}" ] && [ -f "${TESTING_MOCK_RESPONSE}" ];then
+          if [ ! -z "${TESTING_MOCK_RESPONSE}" ] && [ -f "${TESTING_MOCK_RESPONSE}" ]; then
             echo "Using test mock response"
             cat "${TESTING_MOCK_RESPONSE}" > /tmp/jobstatus.json
           else
@@ -180,12 +180,12 @@ steps:
           load_current_workflow_values
           
           JOB_NAME="${CIRCLE_JOB}"
-          if [ "<<parameters.job-regex>>" ] ;then
+          if [ "<<parameters.job-regex>>" ]; then
             JOB_NAME="<<parameters.job-regex>>"
           fi
 
           # falsey parameters are empty strings, so always compare against 'true' 
-          if [ "<<parameters.block-workflow>>" = "true" ] ;then
+          if [ "<<parameters.block-workflow>>" = "true" ]; then
             echo "Orb parameter block-workflow is true."
             if [ "<<parameters.only-on-workflow>>" = "*" ]; then
               echo "This job will block until no previous workflows have *any* jobs running."
@@ -208,7 +208,7 @@ steps:
             exit 1
           fi
           echo "Oldest job: $oldest_running_build_num"
-          if [ -z $oldest_commit_time ];then
+          if [ -z $oldest_commit_time ]; then
             echo "API Call for existing jobs failed, failing this build.  Please check API token"
             echo "All running jobs:"
             cat /tmp/jobstatus.json || exit 0
@@ -264,10 +264,10 @@ steps:
           update_comparables
           echo "This Workflow Timestamp: ${my_commit_time}"
           echo "Oldest Workflow Timestamp: ${oldest_commit_time}"
-          if [[ ! -z "${my_commit_time}" ]] && [[ "${oldest_commit_time}" > "${my_commit_time}" || "${oldest_commit_time}" = "${my_commit_time}" ]] ; then
+          if [[ ! -z "${my_commit_time}" ]] && [[ "${oldest_commit_time}" > "${my_commit_time}" || "${oldest_commit_time}" = "${my_commit_time}" ]]; then
             # API returns Y-M-D HH:MM (with 24 hour clock) so alphabetical string compare is accurate to timestamp compare as well
             # recent-jobs API does not include pending, so it is possible we queried in between a workflow transition, and we're NOT really front of line.
-            if [ "${confidence}" -lt "<<parameters.confidence>>" ];then
+            if [ "${confidence}" -lt "<<parameters.confidence>>" ]; then
               # To grow confidence, we check again with a delay.
               confidence=$((confidence+1))
               echo "API shows no previous jobs/workflows, but it is possible a previous workflow has pending jobs not yet visible in API."
@@ -285,7 +285,7 @@ steps:
 
           if [ $wait_time -ge $max_time_seconds ]; then
             echo "Max wait time exceeded, considering response."
-            if [ "<<parameters.dont-quit>>" == "true" ];then
+            if [ "<<parameters.dont-quit>>" == "true" ]; then
               echo "Orb parameter dont-quit is set to true, letting this job proceed!"
               exit 0
             else
