@@ -64,7 +64,7 @@ steps:
         urlencode(){
           LC_WAS="${LC_ALL:-}"
           export LC_ALL=C
-          string="$1"
+          string="${1}"
           while [ -n "$string" ]; do
             tail="${string#?}"
             head="${string%$tail}"
@@ -80,11 +80,23 @@ steps:
 
         fetch(){
           echo "DEBUG: Making API Call to ${1}"
-          url=$1
-          target=$2
-          http_response=$(curl -s -X GET -H "Circle-Token:${<< parameters.circleci-api-key >>}" -H "Content-Type: application/json" -o "${target}" -w "%{http_code}" "${url}")
-          if [ $http_response != "200" ]; then
-              echo "ERROR: Server returned error code: $http_response"
+          url="${1}"
+          target="${2}"
+          
+          http_response="0"
+          retries="3"
+          while [ "${http_response}" -ne "200" ] && [ "${retries}" -gt "0" ]; do
+            set +e
+            http_response=$(curl -s -X GET -H "Circle-Token:${<< parameters.circleci-api-key >>}" -H "Content-Type: application/json" -o "${target}" -w "%{http_code}" "${url}")
+            set -e
+            if [ "${http_response}" -ne "200" ]; then
+              retries="$(( retries - 1 ))"
+              sleep 1
+            fi
+          done
+          
+          if [ "${http_response}" -ne "200" ]; then
+              echo "ERROR: Server returned error code: ${http_response}"
               cat ${target}
               exit 1
           else
