@@ -82,6 +82,7 @@ steps:
           echo "DEBUG: Making API Call to ${1}"
           url="${1}"
           target="${2}"
+          allow_not_found="${3:-false}"
           
           http_response="0"
           retries="3"
@@ -89,7 +90,13 @@ steps:
             set +e
             http_response=$(curl -s -X GET -H "Circle-Token:${<< parameters.circleci-api-key >>}" -H "Content-Type: application/json" -o "${target}" -w "%{http_code}" "${url}")
             set -e
-            if [ "${http_response}" -ne "200" ]; then
+            if [ "${http_response}" -eq "404" ]; then
+              if [ "${allow_not_found}" == "true" ]; then
+                echo "WARN: Server returned 404, but it is allowed: ${url}"
+                rm "${target}"
+                http_response="200"
+              fi
+            elif [ "${http_response}" -ne "200" ]; then
               retries="$(( retries - 1 ))"
               sleep 1
             fi
@@ -97,7 +104,7 @@ steps:
           
           if [ "${http_response}" -ne "200" ]; then
               echo "ERROR: Server returned error code: ${http_response}"
-              cat ${target}
+              cat "${target}"
               exit 1
           else
               echo "DEBUG: API Success"
@@ -159,16 +166,18 @@ steps:
             workflow_file=/tmp/workflow-${workflow}.json
             if [ ! -z "${TESTING_MOCK_WORKFLOW_RESPONSES}" ] && [ -f "${TESTING_MOCK_WORKFLOW_RESPONSES}/${workflow}.json" ]; then
               echo "Using test mock workflow response"
-              cat "${TESTING_MOCK_WORKFLOW_RESPONSES}/${workflow}.json" > "${workflow_file}"
+              cat "${TESTING_MOCK_WORKFLOW_RESPONSES}/${workflow}.json" > "${workflow_file}" "true"
             else
-              fetch "${CIRCLECI_BASE_URL}/api/v2/workflow/${workflow}" "${workflow_file}"
+              fetch "${CIRCLECI_BASE_URL}/api/v2/workflow/${workflow}" "${workflow_file}" "true"
             fi
-            created_at=$(jq -r '.created_at' "${workflow_file}")
-            echo "Workflow was created at: ${created_at}"
-            cat /tmp/augmented_jobstatus.json | jq --arg created_at "${created_at}" --arg workflow "${workflow}" '(.[] | select(.workflows.workflow_id == $workflow) | .workflows) |= . + {created_at:$created_at}' > /tmp/augmented_jobstatus-${workflow}.json
-            #DEBUG echo "new augmented_jobstatus:"
-            #DEBUG cat /tmp/augmented_jobstatus-${workflow}.json
-            mv /tmp/augmented_jobstatus-${workflow}.json /tmp/augmented_jobstatus.json
+            if [ -f "${workflow_file}" ]; then
+              created_at=$(jq -r '.created_at' "${workflow_file}")
+              echo "Workflow was created at: ${created_at}"
+              cat /tmp/augmented_jobstatus.json | jq --arg created_at "${created_at}" --arg workflow "${workflow}" '(.[] | select(.workflows.workflow_id == $workflow) | .workflows) |= . + {created_at:$created_at}' > /tmp/augmented_jobstatus-${workflow}.json
+              #DEBUG echo "new augmented_jobstatus:"
+              #DEBUG cat /tmp/augmented_jobstatus-${workflow}.json
+              mv /tmp/augmented_jobstatus-${workflow}.json /tmp/augmented_jobstatus.json
+            fi
           done
         }
 
