@@ -1,4 +1,4 @@
-  
+
 version: 2.1
 
 parameters:
@@ -10,27 +10,20 @@ parameters:
 workflows:
   build-deploy:
     jobs:
-      - validate:
-          filters:
-            branches:
-              ignore: 
-                - master
+      - validate
       - test:
-          context: [orbs]
-          requires: 
+          context:
+            - orb-publication
+          requires:
             - validate
-          filters:
-            branches:
-              only: 
-                - staging
-                - trying
       - publish:
-          context: [orbs]
+          context:
+            - orb-publication
           requires:
             - test
           filters:
             branches:
-              only: staging
+              only: infra/main
 
 jobs:
   validate:
@@ -49,11 +42,10 @@ jobs:
       - checkout
       - install-circleci
       - pack-and-validate
-      - pr-info
       - run:
           name: Publish Dev
           command: |
-            PUBLISH_MESSAGE=`circleci orb publish packed.yml eddiewebb/<<pipeline.parameters.orbname>>@dev:<<pipeline.number>> --token ${CIRCLECI_API_KEY}`
+            PUBLISH_MESSAGE=`circleci orb publish packed.yml griffinbank/<<pipeline.parameters.orbname>>@dev:<<pipeline.number>> --token ${CIRCLECI_API_KEY}`
             ORB_VERSION=$(echo $PUBLISH_MESSAGE | sed -n 's/Orb `\(.*\)` was published.*/\1/p')
             echo "export ORB_VERSION=\"${ORB_VERSION}\"" >> $BASH_ENV
             echo $ORB_VERSION
@@ -62,22 +54,8 @@ jobs:
       - run:
           name: Import Tests using BATS
           command: |
-            export BATS_IMPORT_DEV_ORB="eddiewebb/<<pipeline.parameters.orbname>>@dev:<<pipeline.number>>"
-            bats --jobs 8 test            
-      - pr-comment
-      - run:
-          name: Check Semver
-          command: |
-            if [ "$PR_NUMBER" == "" ];then
-              echo "No pr found, do nothing"
-              exit 0
-            fi
-            TITLE=`curl -u eddiewebb:${GHI_TOKEN} "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}" | jq '.title' `
-            SEMVER_INCREMENT=`echo $TITLE | sed -En 's/.*\[semver:(major|minor|patch|skip)\].*/\1/p'`
-            if [ -z ${SEMVER_INCREMENT} ];then
-              echo "Merge commit did not indicate which SemVer increment to make. Please ammend commit with [semver:FOO] where FOO is major, minor, or patch"
-              exit 1
-            fi         
+            export BATS_IMPORT_DEV_ORB="griffinbank/<<pipeline.parameters.orbname>>@dev:<<pipeline.number>>"
+            bats --jobs 8 test                
 
   publish:
     docker:
@@ -85,8 +63,7 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
-      - install-circleci   
-      - pr-info  
+      - install-circleci
       - when:
           condition:
             or:
@@ -108,9 +85,7 @@ jobs:
                     PUBLISH_MESSAGE=`circleci orb publish promote eddiewebb/<<pipeline.parameters.orbname>>@dev:<<pipeline.number>> ${SEMVER_INCREMENT} --token ${CIRCLECI_API_KEY}`            
                     echo $PUBLISH_MESSAGE
                     ORB_VERSION=$(echo $PUBLISH_MESSAGE | sed -n 's/Orb .* was promoted to `\(.*\)`.*/\1/p')
-                    echo "export PR_MESSAGE=\"BotComment: *Production* version of orb available for use - \\\`${ORB_VERSION}\\\`\"" >> $BASH_ENV
                   fi
-      - pr-comment
 
 
 
@@ -119,7 +94,7 @@ commands:
   install-bats:
     description: installs the BATS bash testing tool
     steps:
-      - run:      
+      - run:
           name: Install BATS (bash testing)
           command: |
             cd /tmp && git clone https://github.com/bats-core/bats-core.git && cd bats-core
@@ -129,11 +104,11 @@ commands:
           command: |
             curl -L https://github.com/mikefarah/yq/releases/download/v4.14.1/yq_linux_amd64 -o yq
             chmod a+x yq
-            mv yq /usr/local/bin/            
+            mv yq /usr/local/bin/
   install-circleci:
     description: installs the new CIrcleCI CLI with orb support
     steps:
-      - run: 
+      - run:
           name: Install CircleCI CLI (the new one)
           command: |
             curl https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh --fail --show-error | sudo bash
@@ -149,28 +124,3 @@ commands:
           command: |
             circleci orb pack src > packed.yml
             circleci orb validate packed.yml
-  pr-comment:
-    description: add message to pr this build originated from
-    steps:
-      - run:
-          name: Publish Version to PR
-          command: |
-            if [ "$PR_NUMBER" == "" ];then
-              echo "No pr found, do nothing"
-              exit 0
-            fi
-            curl -X POST -u eddiewebb:${GHI_TOKEN} "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments" -d "{\"body\":\"${PR_MESSAGE}\"}"
-  pr-info:
-    description: get PR number this change originated from
-    steps:
-      - run:
-          name: Get PR Info
-          command: |
-            #During OPEN PR, get from CCI.
-            PR_NUMBER=${CIRCLE_PULL_REQUEST##*/}
-            if [ -z "$PR_NUMBER" ];then
-              # get from merge commit on closed PR.
-              PR_NUMBER=`git log -1 --pretty=%s  | sed -En 's/.*\(#([0-9]*)\).*/\1/p'`
-            fi
-            echo "PR_NUMBER is ${PR_NUMBER}"
-            echo "export PR_NUMBER=${PR_NUMBER}" >> $BASH_ENV
