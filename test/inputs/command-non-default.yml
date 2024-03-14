@@ -1,21 +1,12 @@
 jobs:
   build:
     docker:
-      - image: circleci/node:10
+      - image: cimg/node:lts
     working_directory: ~/repo
     steps:
-      - queue/until_front_of_line:
-          #all non default values to assert passthrough no typos, etc
-          this-branch-only: false
-          block-workflow: true
-          max-wait-time: "1/10"
+      - circleci-queue/until_front_of_line:
+          # non-defaults for each paramter
+          time: "1"
+          consider-branch: false
           dont-quit: true
-          force-cancel-previous: true
-          limit-branch-name: 'unique-branch-name'
-          limit-workflow-name: 'unique-workflow-name'
-          confidence: "100"
-          circleci-api-key: 'ABC_123'
-          tag-pattern: 'unique-tag-pattern'
-          job-regex: 'unique-job-regex'
-          circleci-hostname: 'unique-hostname'
-          my-pipeline: 2
+          block-workflow: true
