@@ -46,7 +46,7 @@ examples:
     usage:
       version: 2.1
       orbs:
-        queue: griffinbank/queue@volatile
+        queue: griffinbank/circleci-queue@volatile
 
       workflows:
         build_deploy:
@@ -67,7 +67,7 @@ examples:
     usage:
       version: 2.1
       orbs:
-        queue: griffinbank/queue@volatile
+        queue: griffinbank/circleci-queue@volatile
 
       workflows:
         build_deploy:
@@ -98,7 +98,7 @@ examples:
     usage:
       version: 2.1
       orbs:
-        queue: griffinbank/queue@volatile
+        queue: griffinbank/circleci-queue@volatile
 
       workflows:
         build_deploy:
