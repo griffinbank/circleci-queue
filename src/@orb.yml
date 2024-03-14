@@ -35,7 +35,7 @@ description: |
 
 
 
-  
+
 display:
   home_url: https://eddiewebb.github.io/circleci-queue/
   source_url: https://github.com/eddiewebb/circleci-queue
@@ -58,7 +58,7 @@ examples:
             - some_other_job:
                 requires:
                   - queue/block_workflow
-           
+
   single_concurrency_job:
     description: |
       Used to ensure that a only single job (deploy) is not run concurrently. 
@@ -79,20 +79,20 @@ examples:
       jobs:
         build:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - run: echo "This job can overlap"
 
         deploy:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - queue/until_front_of_line:
                 my-pipeline: <<pipeline.number>>  # Required due to orb processing flow
                 max-wait-time: "10"                # max wait, in minutes (default 10)
                 limit-branch-name: main  # restrict queueing to a specific branch (default *)
             - run: echo "This job will not overlap"
-  
+
   multiple_job_names_regexp:
     description: Use regexp-jobname when you have multiple jobs to block order of.
     usage:
@@ -113,19 +113,19 @@ examples:
       jobs:
         build:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - run: echo "This job can overlap"
 
         DeployStep1:
           docker:
-            - image: circleci/node:10
+            - image: cimg/node:lts
           steps:
             - queue/until_front_of_line:
                 my-pipeline: <<pipeline.number>>  # Required due to orb processing flow
                 max-wait-time: "10"                # max wait, in minutes (default 10)
                 limit-branch-name: main  # restrict queueing to a specific branch (default *)
-                job-regex: "^DeployStep[0-9]$" #use extendex regexp pattern 
+                job-regex: "^DeployStep[0-9]$" #use extendex regexp pattern
             - run: echo "This job will not overlap with itself or next similar nameds job"
 
         DeployStep2:
