@@ -27,7 +27,7 @@ load_variables(){
     : ${VCS_TYPE:?"Required VCS TYPE not found! This is likely a bug in orb, please report."}
     : ${MY_BRANCH:?"Required MY_BRANCH not found! This is likely a bug in orb, please report."}
     : ${MY_PIPELINE_NUMBER:?"Required MY_PIPELINE_NUMBER not found! This is likely a bug in orb, please report."}
-    
+
     # If a pattern is wrapped with slashes, remove them.
     if [[ "$TAG_PATTERN" == /*/ ]]; then
         TAG_PATTERN=${TAG_PATTERN:1:-1}
@@ -55,7 +55,7 @@ do_we_run(){
         echo "TAG_PATTERN defined, but not on tagged run, skip queueing!"
         exit 0
     fi
-    
+
     if [ ! -z "$CIRCLE_PR_REPONAME" ]; then
         echo "Queueing on forks is not supported. Skipping queue..."
         # It's important that we not fail here because it could cause issues on the main repo's branch
@@ -70,16 +70,16 @@ do_we_run(){
 }
 
 
-update_active_run_data(){     
+update_active_run_data(){
     fetch_filtered_active_builds
     augment_jobs_with_pipeline_data
-    
+
     JOB_NAME="${CIRCLE_JOB}"
     if [ "${JOB_REGEXP}" ] ;then
         JOB_NAME="${JOB_REGEXP}"
     fi
 
-    # falsey parameters are empty strings, so always compare against 'true' 
+    # falsey parameters are empty strings, so always compare against 'true'
     if [ "${BLOCK_WORKFLOW}" != "false" ] ;then
         echo "Orb parameter block-workflow is true. Any previous (matching) pipelines with running workflows will block this entire workflow."
         if [ "${ONLY_ON_WORKFLOW}" = "*" ]; then
@@ -119,7 +119,7 @@ fetch_filtered_active_builds(){
     JOB_API_SUFFIX="?filter=running&shallow=true"
     jobs_api_url_template="${CIRCLECI_BASE_URL}/api/v1.1/project/${VCS_TYPE}/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}${JOB_API_SUFFIX}"
     if [ "${FILTER_BRANCH}" == "false" ];then
-        echo "Orb parameter 'this-branch-only' is false, will block previous builds on any branch." 
+        echo "Orb parameter 'this-branch-only' is false, will block previous builds on any branch."
     else
         #branch filter
         : ${CIRCLE_BRANCH:?"Required Env Variable not found!"}
@@ -151,15 +151,20 @@ augment_jobs_with_pipeline_data(){
             echo "Using test mock workflow response"
             cat $TESTING_MOCK_WORKFLOW_RESPONSES/${workflow}.json > ${workflow_file}
         else
-            fetch "${CIRCLECI_BASE_URL}/api/v2/workflow/${workflow}" "${workflow_file}"
+            # Ensure CircleCI API errors where very old jobs listed in the initial active builds that can't be fetched
+            # don't cause a problem here.
+            fetch "${CIRCLECI_BASE_URL}/api/v2/workflow/${workflow}" "${workflow_file}" "true"
         fi
-        pipeline_id=`jq -r '.pipeline_id' ${workflow_file}`
-        pipeline_number=`jq -r '.pipeline_number' ${workflow_file}`
-        echo "Workflow: ${workflow} is from pipeline #${pipeline_number}"
-        cat $AUGMENTED_JOBSTATUS_PATH | jq --arg pipeline_number "${pipeline_number}" --arg workflow "${workflow}" '(.[] | select(.workflows.workflow_id == $workflow) | .workflows) |= . + {pipeline_number:$pipeline_number}' > ${TMP_DIR}/augmented_jobstatus-${workflow}.json
-        #DEBUG echo "new augmented_jobstatus:"
-        #DEBUG cat ${TMP_DIR}/augmented_jobstatus-${workflow}.json
-        mv ${TMP_DIR}/augmented_jobstatus-${workflow}.json $AUGMENTED_JOBSTATUS_PATH
+
+        if [ -f "${workflow_file}" ]; then
+          pipeline_id=`jq -r '.pipeline_id' ${workflow_file}`
+          pipeline_number=`jq -r '.pipeline_number' ${workflow_file}`
+          echo "Workflow: ${workflow} is from pipeline #${pipeline_number}"
+          cat $AUGMENTED_JOBSTATUS_PATH | jq --arg pipeline_number "${pipeline_number}" --arg workflow "${workflow}" '(.[] | select(.workflows.workflow_id == $workflow) | .workflows) |= . + {pipeline_number:$pipeline_number}' > ${TMP_DIR}/augmented_jobstatus-${workflow}.json
+          #DEBUG echo "new augmented_jobstatus:"
+          #DEBUG cat ${TMP_DIR}/augmented_jobstatus-${workflow}.json
+          mv ${TMP_DIR}/augmented_jobstatus-${workflow}.json $AUGMENTED_JOBSTATUS_PATH
+        fi
     done
 }
 
@@ -182,11 +187,33 @@ urlencode(){
 
 fetch(){
     if [[ $DEBUG != "false" ]];then
-        echo "DEBUG: Making API Call to ${1}"    
+        echo "DEBUG: Making API Call to ${1}"
     fi
-    url=$1
-    target=$2
-    http_response=$(curl -s -X GET -H "Circle-Token:${CCI_TOKEN}" -H "Content-Type: application/json" -o "${target}" -w "%{http_code}" "${url}")
+    url="${1}"
+    target="${2}"
+    allow_not_found="${3:-false}"
+
+    http_response="0"
+    retries="3"
+    while [ "${http_response}" -ne "200" ] && [ "${retries}" -gt "0" ]; do
+      # Allow curl to fail with TLS handshake error etc and not exit the whole orb
+      set +e
+      http_response=$(curl -s -X GET -H "Circle-Token:${CCI_TOKEN}" -H "Content-Type: application/json" -o "${target}" -w "%{http_code}" "${url}")
+      set -e
+
+      if [ "${http_response}" -eq "404" ] && [ "${allow_not_found}" == "true" ]; then
+          echo "WARN: Server returned 404, but it is allowed: ${url}"
+          rm "${target}"
+          http_response="200"
+      elif [ "${http_response}" -ne "200" ]; then
+        retries="$(( retries - 1 ))"
+        if [[ $DEBUG != "false" ]]; then
+            echo "DEBUG: Non-successful response. ${retries} retries remaining."
+        fi
+        sleep 1
+      fi
+    done
+
     if [ $http_response != "200" ]; then
         echo "ERROR: Server returned error code: $http_response"
         cat ${target}
@@ -212,7 +239,7 @@ cancel_build_num(){
 
 #
 # MAIN LOGIC STARTS HERE
-# 
+#
 load_variables
 do_we_run #exit early if we can
 echo "Max Queue Time: ${max_time_seconds} seconds."
